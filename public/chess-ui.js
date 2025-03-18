@@ -28,6 +28,7 @@ function initializeChessBoard() {
     
     board = Chessboard('board', config);
     window.addEventListener('resize', board.resize);
+    console.log('Chess board initialized');
 }
 
 /**
@@ -68,51 +69,57 @@ function showTemporaryMessage(message, elementId = 'moveStatus') {
  * @param {Array<number>} boardData - Array of pieces (0-12)
  */
 function updateChessBoard(boardData) {
+    console.log('Updating board with new state:', boardData);
+    
     // Reset the chess.js game to empty board
     game = new Chess();
     game.clear();
-    
-    // Convert the board data to FEN notation piece placement
-    let fenBoard = '';
-    
-    // Map from our piece numbers to FEN characters
-    const pieceToFen = {
-        0: '', // empty
-        1: 'P', 2: 'N', 3: 'B', 4: 'R', 5: 'Q', 6: 'K', // white pieces
-        7: 'p', 8: 'n', 9: 'b', 10: 'r', 11: 'q', 12: 'k' // black pieces
-    };
     
     // Create position for chess.js
     let position = {};
     
     // Convert from our board representation to chess.js position
-    for (let rank = 7; rank >= 0; rank--) {
-        for (let file = 0; file < 8; file++) {
-            const index = rank * 8 + file;
-            const piece = parseInt(boardData[index]);
+    for (let i = 0; i < boardData.length; i++) {
+        const piece = parseInt(boardData[i]);
+        if (piece !== 0) {
+            // Convert from 0-63 to chess notation (a1-h8)
+            const file = String.fromCharCode('a'.charCodeAt(0) + (i % 8));
+            const rank = Math.floor(i / 8) + 1;
+            const square = file + rank;
             
-            if (piece !== 0) {
-                const square = String.fromCharCode('a'.charCodeAt(0) + file) + (rank + 1);
-                const fenPiece = pieceToFen[piece];
-                
-                // Add to position object for chessboard.js
-                if (fenPiece) {
-                    const color = (piece <= 6) ? 'w' : 'b';
-                    const pieceType = fenPiece.toLowerCase();
-                    position[square] = color + pieceType;
-                    
-                    // Also manually place piece in chess.js
-                    game.put({ type: pieceType, color: color === 'w' ? 'w' : 'b' }, square);
-                }
+            // Map our piece numbers to chessboard.js piece notation
+            let pieceNotation = '';
+            switch (piece) {
+                case 1: pieceNotation = 'wP'; break; // White pawn
+                case 2: pieceNotation = 'wN'; break; // White knight
+                case 3: pieceNotation = 'wB'; break; // White bishop
+                case 4: pieceNotation = 'wR'; break; // White rook
+                case 5: pieceNotation = 'wQ'; break; // White queen
+                case 6: pieceNotation = 'wK'; break; // White king
+                case 7: pieceNotation = 'bP'; break; // Black pawn
+                case 8: pieceNotation = 'bN'; break; // Black knight
+                case 9: pieceNotation = 'bB'; break; // Black bishop
+                case 10: pieceNotation = 'bR'; break; // Black rook
+                case 11: pieceNotation = 'bQ'; break; // Black queen
+                case 12: pieceNotation = 'bK'; break; // Black king
+            }
+            
+            position[square] = pieceNotation;
+            
+            // Also add to chess.js game
+            if (pieceNotation) {
+                const color = pieceNotation.charAt(0) === 'w' ? 'w' : 'b';
+                const type = pieceNotation.charAt(1).toLowerCase();
+                game.put({ type, color }, square);
             }
         }
     }
     
-    console.log('Updated chess.js board:', game.fen());
-    console.log('Position for chessboard:', position);
+    console.log('Position object for chessboard:', position);
+    console.log('Updated chess.js board FEN:', game.fen());
     
     // Update the visual board
-    board.position(position, false);
+    board.position(position, true); // true = animate
 }
 
 /**
@@ -124,11 +131,17 @@ function updateGameUI(gameState) {
     if (gameState.activeColor === TEAM.WHITE) {
         currentTurnElement.textContent = 'White';
         // Also update the chess.js turn
-        game.load(game.fen().replace(/ (b|w) /, ' w '));
+        const fen = game.fen();
+        const parts = fen.split(' ');
+        parts[1] = 'w';
+        game.load(parts.join(' '));
     } else {
         currentTurnElement.textContent = 'Black';
         // Also update the chess.js turn
-        game.load(game.fen().replace(/ (b|w) /, ' b '));
+        const fen = game.fen();
+        const parts = fen.split(' ');
+        parts[1] = 'b';
+        game.load(parts.join(' '));
     }
     
     // Update game status
@@ -207,7 +220,6 @@ function onDragStart(source, piece, position, orientation) {
     console.log('Drag start:', source, piece);
     console.log('Current turn:', currentTurnElement.textContent);
     console.log('User team:', userTeam);
-    console.log('Game turn in chess.js:', game.turn());
     
     // Do not allow moves if game is over
     if (gameStatusElement.textContent.includes('Game Over')) {
@@ -247,7 +259,6 @@ function onDragStart(source, piece, position, orientation) {
 function onDrop(source, target, piece, newPos, oldPos, orientation) {
     // Log for debugging
     console.log('Drop:', source, target, piece);
-    console.log('Chess.js state before move:', game.fen());
     
     // Set the correct turn in chess.js
     const currentTurn = currentTurnElement.textContent === 'White' ? 'w' : 'b';
@@ -256,16 +267,12 @@ function onDrop(source, target, piece, newPos, oldPos, orientation) {
     parts[1] = currentTurn;
     game.load(parts.join(' '));
     
-    console.log('Updated turn in chess.js:', game.turn());
-    
     // Try the move in chess.js
     let move = game.move({
         from: source,
         to: target,
         promotion: 'q' // Always promote to a queen for simplicity
     });
-    
-    console.log('Move result:', move);
     
     if (move === null) {
         showTemporaryMessage("Invalid move according to chess rules.");
@@ -298,7 +305,7 @@ function onDrop(source, target, piece, newPos, oldPos, orientation) {
  */
 function onSnapEnd() {
     // Update the board position after the piece snap
-    board.position(game.fen(), false);
+    board.position(game.fen());
 }
 
 /**
@@ -338,7 +345,7 @@ async function submitMove(fromSquare, toSquare, promotion) {
         
         if (success) {
             showTemporaryMessage('Move submitted successfully!');
-            // Update the game state after the move
+            // Immediate refresh after successful move
             await updateGameState();
         } else {
             showTemporaryMessage('Error making move. Please try again.');
@@ -358,13 +365,17 @@ async function submitMove(fromSquare, toSquare, promotion) {
  */
 async function updateGameState() {
     try {
+        console.log('Fetching current game state from blockchain...');
         const boardData = await getBoardState();
         const gameState = await getGameState();
         
         if (boardData && gameState) {
+            console.log('Successfully received data from blockchain');
+            // Always update the board and UI with the latest data
             updateChessBoard(boardData);
             updateGameUI(gameState);
         } else {
+            console.error('Failed to get game state or board data');
             gameStatusElement.textContent = 'Error fetching game state';
         }
     } catch (error) {

@@ -79,12 +79,35 @@ async function checkUserTeam() {
  */
 async function getBoardState() {
     try {
+        // Using get_board to get all squares at once
         const boardData = await chessContract.methods.get_board().call();
-        console.log('Board data received:', boardData.length, 'squares');
-        return boardData;
+        console.log('Board data received:', boardData);
+        
+        // Ensure we have numerical values in the array
+        const numericBoardData = boardData.map(value => parseInt(value));
+        console.log('Numeric board data:', numericBoardData);
+        
+        return numericBoardData;
     } catch (error) {
         console.error("Error getting board state:", error);
-        return null;
+        
+        // Fallback to getting individual pieces if get_board fails
+        try {
+            console.log("Trying alternative board loading method...");
+            const boardData = [];
+            
+            // Get each square individually
+            for (let i = 0; i < 64; i++) {
+                const piece = await chessContract.methods.get_piece(i).call();
+                boardData.push(parseInt(piece));
+            }
+            
+            console.log('Individual board data loaded:', boardData);
+            return boardData;
+        } catch (fallbackError) {
+            console.error("Fallback board loading also failed:", fallbackError);
+            return null;
+        }
     }
 }
 
@@ -230,6 +253,13 @@ async function addPlayerToTeam(playerAddress, team) {
 
 // Setup MetaMask event listeners
 if (window.ethereum) {
+    window.addEventListener('load', function() {
+        console.log('Page loaded, checking for existing Web3 connection');
+        if (web3 && web3.eth) {
+            console.log('Web3 already initialized on page load');
+        }
+    });
+    
     window.ethereum.on('accountsChanged', () => {
         console.log('MetaMask account changed, reloading...');
         window.location.reload();
