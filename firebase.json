@@ -1,5 +1,6 @@
 {
   "hosting": {
+    "site": "hw-blockchain-chess",
     "public": "public",
     "ignore": [
       "firebase.json",
