@@ -124,15 +124,26 @@ async function getGameState() {
 async function makeMove(fromSquare, toSquare, promotion) {
     try {
         console.log('Making move:', fromSquare, toSquare, promotion);
+        
+        // Get current gas price and estimate gas needed for this transaction
+        const gasPrice = await web3.eth.getGasPrice();
+        console.log('Current gas price:', gasPrice);
+        
+        // Significantly increase gas limit - chess moves can be complex operations
+        const gasLimit = 500000; // Increased from 200000
+        console.log('Using gas limit:', gasLimit);
+        
         await chessContract.methods.make_move({
             from_square: fromSquare,
             to_square: toSquare,
             promotion: promotion
         }).send({
             from: userAddress,
-            gas: 200000
+            gas: gasLimit,
+            gasPrice: gasPrice
         });
         
+        console.log('Move completed successfully');
         return true;
     } catch (error) {
         console.error("Error making move:", error);
@@ -152,9 +163,14 @@ async function resetGame() {
     
     try {
         console.log('Resetting game...');
+        
+        // Get current gas price
+        const gasPrice = await web3.eth.getGasPrice();
+        
         await chessContract.methods.reset_game().send({
             from: userAddress,
-            gas: 300000
+            gas: 500000, // Increased gas limit
+            gasPrice: gasPrice
         });
         
         console.log('Game reset successfully');
@@ -167,7 +183,6 @@ async function resetGame() {
 
 /**
  * Add a player to a team (admin only)
- * Removes the player from the other team first.
  * @param {string} playerAddress - Ethereum address of the player
  * @param {number} team - Team to add the player to (0 = white, 1 = black)
  * @returns {Promise<boolean>} True if successful, false otherwise
@@ -185,11 +200,9 @@ async function addPlayerToTeam(playerAddress, team) {
     
     try {
         // Check if player is already on a team
-        const otherTeam = team === TEAM.WHITE ? TEAM.BLACK : TEAM.WHITE;
-        const isOnOtherTeam = await chessContract.methods.is_player_on_team(playerAddress, otherTeam).call();
         const isOnSameTeam = await chessContract.methods.is_player_on_team(playerAddress, team).call();
         
-        console.log('Player status - On target team:', isOnSameTeam, 'On other team:', isOnOtherTeam);
+        console.log('Player status - On target team:', isOnSameTeam);
         
         // If already on the same team, we're done
         if (isOnSameTeam) {
@@ -197,11 +210,15 @@ async function addPlayerToTeam(playerAddress, team) {
             return true;
         }
         
+        // Get current gas price
+        const gasPrice = await web3.eth.getGasPrice();
+        
         // Add player to the selected team
         console.log('Adding player to team:', team);
         await chessContract.methods.add_player(playerAddress, team).send({
             from: userAddress,
-            gas: 200000
+            gas: 300000, // Increased gas limit
+            gasPrice: gasPrice
         });
         
         return true;
