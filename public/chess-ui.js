@@ -3,6 +3,7 @@
 let board; // Chessboard.js instance
 let game = new Chess(); // Chess.js game instance
 let userTeam = null; // User's team (0 = white, 1 = black, null = spectator)
+let lastMove = null; // Store the last move for highlighting
 
 // DOM elements
 const currentTurnElement = document.getElementById('currentTurn');
@@ -120,6 +121,39 @@ function updateChessBoard(boardData) {
     
     // Update the visual board
     board.position(position, true); // true = animate
+    
+    // Highlight the last move if there is one
+    highlightLastMove();
+}
+
+/**
+ * Highlight the last move on the board
+ */
+function highlightLastMove() {
+    // Remove any existing highlights
+    removeHighlights();
+    
+    // If there's a last move, highlight the squares
+    if (lastMove) {
+        // Add highlight styling
+        const fromSquare = document.querySelector(`.square-${lastMove.from}`);
+        const toSquare = document.querySelector(`.square-${lastMove.to}`);
+        
+        if (fromSquare) fromSquare.classList.add('highlight-from');
+        if (toSquare) toSquare.classList.add('highlight-to');
+    }
+}
+
+/**
+ * Remove all highlights from the board
+ */
+function removeHighlights() {
+    // Remove highlight styling from all squares
+    const highlights = document.querySelectorAll('.highlight-from, .highlight-to');
+    highlights.forEach(square => {
+        square.classList.remove('highlight-from');
+        square.classList.remove('highlight-to');
+    });
 }
 
 /**
@@ -162,7 +196,29 @@ function updateGameUI(gameState) {
             showWinMessage(winMessage);
         }
     } else {
-        gameStatusElement.textContent = 'In Progress';
+        // Check for checkmate and stalemate using chess.js
+        if (game.in_checkmate()) {
+            const winner = game.turn() === 'w' ? 'Black' : 'White';
+            const winMessage = `Game Over - ${winner} Wins by Checkmate!`;
+            gameStatusElement.textContent = winMessage;
+            showWinMessage(winMessage);
+        } else if (game.in_stalemate()) {
+            const drawMessage = 'Game Over - Draw by Stalemate!';
+            gameStatusElement.textContent = drawMessage;
+            showWinMessage(drawMessage);
+        } else if (game.in_draw()) {
+            const drawMessage = 'Game Over - Draw!';
+            gameStatusElement.textContent = drawMessage;
+            showWinMessage(drawMessage);
+        } else {
+            gameStatusElement.textContent = 'In Progress';
+            
+            // Check for check
+            if (game.in_check()) {
+                const checkMessage = `${currentTurnElement.textContent} is in check!`;
+                showTemporaryMessage(checkMessage);
+            }
+        }
     }
     
     // Update user team display
@@ -279,20 +335,43 @@ function onDrop(source, target, piece, newPos, oldPos, orientation) {
         return 'snapback';
     }
     
+    console.log('Chess.js move result:', move);
+    
     // Convert chess notation to 0-63 index
     const fromSquare = squareToIndex(source);
     const toSquare = squareToIndex(target);
     
-    // Check for promotion
-    let promotion = 0;
-    const isPawnMovingToLastRank = 
-        (piece === 'wP' && target[1] === '8') || 
-        (piece === 'bP' && target[1] === '1');
+    // Check for special moves
+    let isCastling = false;
+    let isEnPassant = move.flags.includes('e'); // En passant flag
+    const isKing = piece === 'wK' || piece === 'bK';
     
-    if (isPawnMovingToLastRank) {
-        // Default promotion to queen for simplicity
-        promotion = 1; // 1 = queen
+    // Detect castling
+    if (isKing && Math.abs(fromSquare % 8 - toSquare % 8) === 2) {
+        isCastling = true;
+        console.log('Castling detected');
     }
+    
+    // Log special moves
+    if (isCastling) {
+        console.log('Castling move:', source, 'to', target);
+    }
+    if (isEnPassant) {
+        console.log('En passant capture:', source, 'to', target);
+    }
+    
+    // Handle pawn promotion
+    let promotion = 0;
+    if (move.flags.includes('p')) { // Promotion flag
+        promotion = 1; // Default to queen
+        console.log('Promotion detected, promoting to queen');
+    }
+    
+    // Store this move for highlighting
+    lastMove = {
+        from: source,
+        to: target
+    };
     
     // Submit move to the blockchain
     submitMove(fromSquare, toSquare, promotion);
@@ -306,6 +385,9 @@ function onDrop(source, target, piece, newPos, oldPos, orientation) {
 function onSnapEnd() {
     // Update the board position after the piece snap
     board.position(game.fen());
+    
+    // Highlight the move
+    highlightLastMove();
 }
 
 /**

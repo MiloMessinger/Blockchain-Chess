@@ -189,10 +189,15 @@ async function resetGame() {
         
         // Get current gas price
         const gasPrice = await web3.eth.getGasPrice();
+        console.log('Using gas price for reset:', gasPrice);
+        
+        // Drastically increase gas limit for reset function due to reentrancy sentry
+        const gasLimit = 1000000; // Much higher gas limit for reset
+        console.log('Using gas limit for reset:', gasLimit);
         
         await chessContract.methods.reset_game().send({
             from: userAddress,
-            gas: 500000, // Increased gas limit
+            gas: gasLimit, // Increased gas limit for reentrancy sentry
             gasPrice: gasPrice
         });
         
@@ -200,6 +205,7 @@ async function resetGame() {
         return true;
     } catch (error) {
         console.error("Error resetting game:", error);
+        alert("Reset game error: " + error.message);
         return false;
     }
 }

@@ -106,7 +106,6 @@ function startGameStatePolling() {
     
     // Set up a new polling interval - check every 2 seconds
     refreshInterval = setInterval(() => {
-        console.log("Polling for game state updates...");
         updateGameState();
     }, 2000); // 2 seconds
     
@@ -123,23 +122,3 @@ function stopGameStatePolling() {
         console.log('Game state polling stopped');
     }
 }
-
-// Add a refresh button for manual refresh
-document.addEventListener('DOMContentLoaded', function() {
-    // Create a refresh button
-    const refreshButton = document.createElement('button');
-    refreshButton.textContent = 'Refresh Board';
-    refreshButton.style.marginTop = '10px';
-    
-    // Add event listener
-    refreshButton.addEventListener('click', () => {
-        console.log('Manual refresh requested');
-        updateGameState();
-    });
-    
-    // Add to the page
-    const boardElement = document.getElementById('board');
-    if (boardElement && boardElement.parentNode) {
-        boardElement.parentNode.insertBefore(refreshButton, boardElement.nextSibling);
-    }
-});
